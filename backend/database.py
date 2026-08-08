@@ -9,6 +9,10 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:prince12@localhost:5432/complaint-project"
 )
 
+# Fix Render's "postgres://" prefix if present (SQLAlchemy 1.4+ requires "postgresql://")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 def create_active_engine():
     if DATABASE_URL.startswith("sqlite"):
         return create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
