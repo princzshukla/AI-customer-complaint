@@ -33,6 +33,7 @@ export const ComplaintForm: React.FC = () => {
     const logId = complaintState.qmsLogId || `QMS-CMP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
 
     // Local commit to Redux state
+    // cast to any to satisfy differing action payload typing
     dispatch(commitToQMS({ logId } as any));
 
     try {
