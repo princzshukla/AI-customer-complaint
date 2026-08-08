@@ -1,0 +1,6 @@
+{
+  "name": "Log Customer Complaint - AIVOA Copilot",
+  "description": "API & FDF Quality Assurance Module for customer complaint logging, risk assessment, and document extraction powered by AIVOA Copilot.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
