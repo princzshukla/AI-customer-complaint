@@ -80,12 +80,21 @@ Task:
             HumanMessage(content=f"User request: {prompt}")
         ]
         
-        res: AgentExtractionOutput = structured_llm.invoke(messages)
-        updated_form = {**current_form, **res.form_updates, "status": "Ready to Commit"}
+        res = structured_llm.invoke(messages)
+        if isinstance(res, dict):
+            assistant_msg = res.get("assistant_message", f"Extracted details for: {prompt[:50]}")
+            updated_fields = res.get("updated_fields_list", ["complaintDescription"])
+            form_upd = res.get("form_updates", {})
+        else:
+            assistant_msg = getattr(res, "assistant_message", f"Extracted details for: {prompt[:50]}")
+            updated_fields = getattr(res, "updated_fields_list", ["complaintDescription"])
+            form_upd = getattr(res, "form_updates", {})
+
+        updated_form = {**current_form, **form_upd, "status": "Ready to Commit"}
         return {
             **state,
-            "assistant_message": res.assistant_message,
-            "updated_fields_list": res.updated_fields_list,
+            "assistant_message": assistant_msg,
+            "updated_fields_list": updated_fields,
             "form_updates": updated_form
         }
     except Exception as e:

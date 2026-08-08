@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -9,17 +9,21 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:prince12@localhost:5432/complaint-project"
 )
 
-# Use SQLite as a fallback if PostgreSQL driver is not installed or SQLite URL is explicitly set
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-else:
+def create_active_engine():
+    if DATABASE_URL.startswith("sqlite"):
+        return create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    
     try:
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-    except Exception:
-# Fallback to sqlite in /tmp for serverless read-only filesystem environments (Vercel)
+        pg_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        with pg_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return pg_engine
+    except Exception as e:
+        print(f"PostgreSQL connection failed ({e}). Falling back to SQLite.")
         sqlite_path = "/tmp/qms_fallback.db" if os.name != "nt" else "./qms_fallback.db"
-        engine = create_engine(f"sqlite:///{sqlite_path}", connect_args={"check_same_thread": False})
+        return create_engine(f"sqlite:///{sqlite_path}", connect_args={"check_same_thread": False})
 
+engine = create_active_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -27,5 +31,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
         db.close()
+
