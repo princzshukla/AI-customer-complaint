@@ -27,7 +27,7 @@ def get_llm(provider: str = "groq", model_name: str = "llama-3.3-70b-versatile")
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
 
-    if groq_key:
+    if groq_key and groq_key.startswith("gsk_") and "your_groq_api_key" not in groq_key and len(groq_key) >= 20:
         target_model = model_name if model_name in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"] else "llama-3.3-70b-versatile"
         return ChatGroq(
             model_name=target_model,
@@ -51,8 +51,30 @@ def get_llm(provider: str = "groq", model_name: str = "llama-3.3-70b-versatile")
 # LangGraph Node 1: Extract and Assess
 def process_complaint_node(state: ComplaintState) -> ComplaintState:
     prompt = state.get("prompt", "")
+    attachment_name = state.get("attachment_name")
+    attachment_base64 = state.get("attachment_base64")
     current_form = state.get("current_form_state", {})
     
+    extracted_text = ""
+    if attachment_base64:
+        try:
+            import base64
+            decoded_bytes = base64.b64decode(attachment_base64)
+            # Simple text extraction for text/CSV/plain PDF streams
+            try:
+                extracted_text = decoded_bytes.decode('utf-8', errors='ignore')
+                # Clean non-printable bytes
+                import re
+                extracted_text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', extracted_text)
+            except Exception:
+                extracted_text = ""
+        except Exception as e:
+            print(f"Base64 decoding notice: {e}")
+
+    user_prompt_content = f"User request: {prompt}"
+    if extracted_text and len(extracted_text.strip()) > 20:
+        user_prompt_content += f"\n\nATTACHED FILE CONTENT ({attachment_name or 'Document'}):\n{extracted_text[:12000]}"
+
     system_prompt = f"""
 You are AIVOA Copilot, a LangGraph AI agent managing a Pharmaceutical Quality Assurance Customer Complaint system.
 CURRENT FORM STATE:
@@ -60,8 +82,9 @@ CURRENT FORM STATE:
 
 Task:
 1. Extract or update customer complaint parameters (Source, Customer, Product, Strength, Batch/Lot, Quantity, Manufacturing/Expiry dates, Site, Impacted NPM, Category, Description, Severity, Suggested Next Action, Initial Risk Assessment).
-2. If updating specific fields (e.g. batch number correction), preserve all existing form values and specify modified field keys in updated_fields_list.
-3. Return structured JSON matching AgentExtractionOutput.
+2. Read the prompt and ATTACHED FILE CONTENT carefully. Extract actual customer, product, batch number, affected quantity, dates, and defect description from the attached file.
+3. If updating specific fields (e.g. batch number correction), preserve all existing form values and specify modified field keys in updated_fields_list.
+4. Return structured JSON matching AgentExtractionOutput.
 """
 
     try:
@@ -77,7 +100,7 @@ Task:
         
         messages = [
             SystemMessage(content=system_prompt),
-            HumanMessage(content=f"User request: {prompt}")
+            HumanMessage(content=user_prompt_content)
         ]
         
         res = structured_llm.invoke(messages)
