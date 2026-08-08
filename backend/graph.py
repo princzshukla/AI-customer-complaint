@@ -24,21 +24,27 @@ class AgentExtractionOutput(BaseModel):
 
 # Initialize LLM for LangGraph node (Supports Groq llama-3.3-70b-versatile or Gemini gemini-2.5-flash)
 def get_llm(provider: str = "groq", model_name: str = "llama-3.3-70b-versatile"):
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
 
-    if groq_key or provider.lower() == "groq":
-        # Support Groq models: llama-3.3-70b-versatile or llama-3.1-8b-instant
+    if groq_key:
         target_model = model_name if model_name in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"] else "llama-3.3-70b-versatile"
         return ChatGroq(
             model_name=target_model,
-            groq_api_key=groq_key if groq_key else "dummy_groq_key",
+            groq_api_key=groq_key,
+            temperature=0.1
+        )
+    elif gemini_key:
+        return ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=gemini_key,
             temperature=0.1
         )
     else:
-        return ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
-            google_api_key=gemini_key if gemini_key else "dummy_key",
+        # If neither key is provided, try Groq with fallback or raise clear warning
+        return ChatGroq(
+            model_name="llama-3.3-70b-versatile",
+            groq_api_key="missing_api_key",
             temperature=0.1
         )
 

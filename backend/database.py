@@ -16,8 +16,9 @@ else:
     try:
         engine = create_engine(DATABASE_URL, pool_pre_ping=True)
     except Exception:
-        # Fallback to local sqlite for instant offline testing without running postgres
-        engine = create_engine("sqlite:///./qms_fallback.db", connect_args={"check_same_thread": False})
+# Fallback to sqlite in /tmp for serverless read-only filesystem environments (Vercel)
+        sqlite_path = "/tmp/qms_fallback.db" if os.name != "nt" else "./qms_fallback.db"
+        engine = create_engine(f"sqlite:///{sqlite_path}", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
