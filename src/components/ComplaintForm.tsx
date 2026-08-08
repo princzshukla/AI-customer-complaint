@@ -31,30 +31,52 @@ export const ComplaintForm: React.FC = () => {
     e.preventDefault();
     dispatch(commitToQMS());
 
+    const logId = complaintState.qmsLogId || `QMS-${Date.now()}`;
+
     try {
-      await fetch(`${API_BASE_URL}/api/complaints`, {
+      const response = await fetch(`${API_BASE_URL}/api/complaints`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          qmsLogId: complaintState.qmsLogId || `QMS-${Date.now()}`,
+          qmsLogId: logId,
+          qms_log_id: logId,
           complaintSource: complaintState.complaintSource,
+          complaint_source: complaintState.complaintSource,
           customerName: complaintState.customerName,
+          customer_name: complaintState.customerName,
           productName: complaintState.productName,
+          product_name: complaintState.productName,
           productStrength: complaintState.productStrength,
+          product_strength: complaintState.productStrength,
           batchLotNumber: complaintState.batchLotNumber,
+          batch_lot_number: complaintState.batchLotNumber,
           affectedQuantity: complaintState.affectedQuantity,
+          affected_quantity: complaintState.affectedQuantity,
           manufacturingDate: complaintState.manufacturingDate,
+          manufacturing_date: complaintState.manufacturingDate,
           expiryDate: complaintState.expiryDate,
+          expiry_date: complaintState.expiryDate,
           originatingSiteBlock: complaintState.originatingSiteBlock,
+          originating_site_block: complaintState.originatingSiteBlock,
           impactedNpm: complaintState.impactedNpm,
+          impacted_npm: complaintState.impactedNpm,
           complaintCategory: complaintState.complaintCategory,
+          complaint_category: complaintState.complaintCategory,
           complaintDescription: complaintState.complaintDescription,
+          complaint_description: complaintState.complaintDescription,
           status: 'Committed',
           severitySuggested: complaintState.severitySuggested,
+          severity_suggested: complaintState.severitySuggested,
           suggestedNextAction: complaintState.suggestedNextAction,
-          initialRiskAssessment: complaintState.initialRiskAssessment
+          suggested_next_action: complaintState.suggestedNextAction,
+          initialRiskAssessment: complaintState.initialRiskAssessment,
+          initial_risk_assessment: complaintState.initialRiskAssessment
         })
       });
+
+      if (!response.ok) {
+        console.warn('Backend responded with status:', response.status);
+      }
     } catch (err) {
       console.warn('API call to /api/complaints failed or non-responsive:', err);
     }
