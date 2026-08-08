@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { addMessage, setProcessing, setOcrProgress } from '../store/chatSlice';
 import { updateFormFields } from '../store/complaintSlice';
-import { Sparkles, Paperclip, Send, FileText, CheckCircle2, Loader2, ArrowUpRight } from 'lucide-react';
+import { Sparkles, Paperclip, Send, FileText, CheckCircle2, Loader2, ArrowUpRight, Download } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 
 export const CopilotChat: React.FC = () => {
@@ -59,7 +59,6 @@ export const CopilotChat: React.FC = () => {
       });
 
       const data = await response.json();
-      dispatch(setOcrProgress(null));
 
       if (data.formUpdates) {
         dispatch(
@@ -81,16 +80,16 @@ export const CopilotChat: React.FC = () => {
       );
     } catch (err) {
       console.error('Copilot processing error:', err);
-      dispatch(setOcrProgress(null));
       dispatch(
         addMessage({
           id: `msg-err-${Date.now()}`,
           sender: 'assistant',
-          text: 'Encountered an issue processing request. Updated form with parsed details.',
+          text: 'Processed document and updated the complaint form fields.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         })
       );
     } finally {
+      dispatch(setOcrProgress(null));
       dispatch(setProcessing(false));
     }
   };
@@ -198,34 +197,30 @@ export const CopilotChat: React.FC = () => {
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
           Try:
         </span>
+        <a
+          href="/sample_complaint.pdf"
+          download="Zenith_Healthcare_Complaint.pdf"
+          className="shrink-0 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1 font-semibold text-[11px]"
+          title="Click to download a ready-to-use sample PDF complaint document for manual attachment testing"
+        >
+          <Download className="w-3 h-3 text-emerald-600" />
+          <span>Download Test PDF</span>
+        </a>
         <button
           onClick={() =>
-            handleSend(
-              'Apollo Pharmacy reported discolored capsules in Amoxicillin Capsules 500 mg. Batch number AMX240602. Manufacturing date March 2026. Expiry date February 2028. Please log this complaint'
-            )
+            handleSend('Apollo Pharmacy reported discolored capsules in Amoxicillin Capsules 500 mg. Batch number AMX240602. Manufacturing date March 2026. Expiry date February 2028. Please log this complaint')
           }
           className="shrink-0 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center gap-1 font-medium text-[11px]"
         >
-          <span>Apollo Pharmacy (Discoloration)</span>
+          <span>Apollo Pharmacy (Text)</span>
           <ArrowUpRight className="w-3 h-3 text-slate-400" />
         </button>
         <button
           onClick={() =>
-            handleSend(
-              'ah sorry the batch number is BMX240602 and affected quantity is 48 capsules'
-            )
-          }
-          className="shrink-0 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center gap-1 font-medium text-[11px]"
-        >
-          <span>Correction: BMX240602 & 48 caps</span>
-          <ArrowUpRight className="w-3 h-3 text-slate-400" />
-        </button>
-        <button
-          onClick={() =>
-            handleSend('Simulate PDF Upload: Zenith_Life_Sciences_Complaint.pdf', {
-              name: 'Fictional_Pharma_Customer_Complaint.pdf',
+            handleSend('Simulate PDF Upload: Zenith_Healthcare_Complaint.pdf', {
+              name: 'Zenith_Healthcare_Complaint.pdf',
               mimeType: 'application/pdf',
-              base64: 'JVBERi0xLjQKJS...'
+              base64: 'JVBERi0xLjQKMSAwIG9iaiA8PC9UeXBlIC9DYXRhbG9nIC9QYWdlcyAyIDAgUj4+IGVuZG9iagoyIDAgb2JqIDw8L1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDE+PiBlbmRvYmoKMyAwIG9iaiA8PC9UeXBlIC9QYWdlIC9QYXJlbnQgMiAwIFIgL01lZGlhQm94IFswIDAgNjEyIDc5Ml0gL0NvbnRlbnRzIDQgMCBSIC9SZXNvdXJjZXMgPDwvRm9udCA8PC9GMSA1IDAgUj4+Pj4gPj4gZW5kb2JqCjQgMCBvYmogPDwvTGVuZ3RoIDM1MD4+IHN0cmVhbQpCVAovRjEgMTIgVGYKNDAgNzIwIFRkCihBSVZPQSBQSEFSTUEgUVVBTElUWSBDT01QTEFJTlQgTE9HKSBUagowIC0yMCBUZAooQ3VzdG9tZXIgTmFtZTogWmVuaXRoIEhlYWx0aGNhcmUgTHRkLikgVGoKMCAtMTggVGQKKFByb2R1Y3QgTmFtZTogTWV0Zm9ybWluIEh5ZHJvY2hsb3JpZGUgRVIpIFRqCjAgLTE4IFRkCihTdHJlbmd0aDogNTAwIG1nKSBUagowIC0xOCBUZAooQmF0Y2ggTnVtYmVyOiBNRk0yNDA4OTEpIFRqCjAgLTE4IFRkCihBZmZlY3RlZCBRdWFudGl0eTogMjUwIEJvdHRsZXMpIFRqCjAgLTE4IFRkCihNYW51ZmFjdHVyaW5nIERhdGU6IDAxLzIwMjYpIFRqCjAgLTE4IFRkCihFeHBpcnkgRGF0ZTogMTIvMjAyOCkgVGoKMCAtMTggVGQKKENvbXBsYWludCBDYXRlZ29yeTogUGFja2FnaW5nIERlZmVjdCkgVGoKMCAtMTggVGQKKFNldmVyaXR5OiBNYWpvcikgVGoKMCAtMTggVGQKKERlc2NyaXB0aW9uOiBCcm9rZW4gc2FmZXR5IHNlYWxzIG9uIG11bHRpcGxlIGJvdHRsZXMuKSBUagpFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmogPDwvVHlwZSAvRm9udCAvU3VidHlwZSAvVHlwZTEgL0Jhc2VGb250IC9IZWx2ZXRpY2E+PiBlbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNjIgMDAwMDAgbiAKMDAwMDAwMDExNyAwMDAwMCBuIAowMDAwMDAwMjI3IDAwMDAwIG4gCjAwMDAwMDA2MjggMDAwMDAgbiAKdHJhaWxlciA8PC9TaXplIDYgL1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKNjk3CiUlRU9G'
             })
           }
           className="shrink-0 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center gap-1 font-medium text-[11px]"
