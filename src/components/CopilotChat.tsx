@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { addMessage, setProcessing, setOcrProgress } from '../store/chatSlice';
 import { updateFormFields } from '../store/complaintSlice';
 import { Sparkles, Paperclip, Send, FileText, CheckCircle2, Loader2, ArrowUpRight } from 'lucide-react';
+import { API_BASE_URL } from '../lib/api';
 
 export const CopilotChat: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -47,7 +48,7 @@ export const CopilotChat: React.FC = () => {
 
     try {
       // Call server API route
-      const response = await fetch('/api/copilot/process', {
+      const response = await fetch(`${API_BASE_URL}/api/copilot/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

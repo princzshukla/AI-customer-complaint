@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { updateFormFields, commitToQMS, clearFieldHighlights } from '../store/complaintSlice';
 import { Sparkles, Building2, Package, ShieldAlert, CheckCircle2, Factory, Wrench, FileCheck2 } from 'lucide-react';
 import { AIInsightsModal } from './AIInsightsModal';
+import { API_BASE_URL } from '../lib/api';
 
 export const ComplaintForm: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -31,7 +32,7 @@ export const ComplaintForm: React.FC = () => {
     dispatch(commitToQMS());
 
     try {
-      await fetch('/api/complaints', {
+      await fetch(`${API_BASE_URL}/api/complaints`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
