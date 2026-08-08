@@ -123,13 +123,40 @@ async def process_copilot_request(req: CopilotRequest):
             formUpdates={**req.currentFormState, "complaintDescription": req.prompt}
         )
 
+def format_complaint_response(c: models.QMSComplaint) -> Dict[str, Any]:
+    committed_str = c.committed_at.strftime("%Y-%m-%d %H:%M:%S") if c.committed_at else ""
+    return {
+        "id": c.qms_log_id,
+        "qmsLogId": c.qms_log_id,
+        "complaintSource": c.complaint_source or "",
+        "customerName": c.customer_name or "",
+        "productName": c.product_name or "",
+        "productStrength": c.product_strength or "",
+        "batchLotNumber": c.batch_lot_number or "",
+        "affectedQuantity": c.affected_quantity or "",
+        "manufacturingDate": c.manufacturing_date or "",
+        "expiryDate": c.expiry_date or "",
+        "originatingSiteBlock": c.originating_site_block or "",
+        "impactedNpm": c.impacted_npm or "",
+        "complaintCategory": c.complaint_category or "",
+        "complaintDescription": c.complaint_description or "",
+        "status": c.status or "Committed",
+        "severitySuggested": c.severity_suggested or "Medium",
+        "suggestedNextAction": c.suggested_next_action or "",
+        "initialRiskAssessment": c.initial_risk_assessment or "",
+        "loggedAt": committed_str,
+        "committedAt": committed_str,
+        "updatedFields": []
+    }
+
 @app.get("/api/complaints")
 def list_complaints(db: Session = Depends(get_db)):
     try:
         complaints = db.query(models.QMSComplaint).order_by(models.QMSComplaint.committed_at.desc()).all()
-        return complaints
+        return [format_complaint_response(c) for c in complaints]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        print(f"Error listing complaints: {e}")
+        return []
 
 @app.post("/api/complaints")
 def create_complaint(data: ComplaintCreateSchema, db: Session = Depends(get_db)):
@@ -152,41 +179,61 @@ def create_complaint(data: ComplaintCreateSchema, db: Session = Depends(get_db))
         next_action = data.suggested_next_action or data.suggestedNextAction or ""
         risk_assess = data.initial_risk_assessment or data.initialRiskAssessment or ""
 
-        complaint = models.QMSComplaint(
-            qms_log_id=log_id,
-            complaint_source=source,
-            customer_name=cust_name,
-            product_name=prod_name,
-            product_strength=prod_strength,
-            batch_lot_number=batch_no,
-            affected_quantity=affected_qty,
-            manufacturing_date=mfg_date,
-            expiry_date=exp_date,
-            originating_site_block=site_block,
-            impacted_npm=npm,
-            complaint_category=category,
-            complaint_description=description,
-            status=status_val,
-            severity_suggested=severity,
-            suggested_next_action=next_action,
-            initial_risk_assessment=risk_assess
-        )
-        db.add(complaint)
-        
-        # Log to Audit Trail
-        audit_entry = models.QMSAuditTrail(
-            qms_log_id=log_id,
-            action="COMPLAINT_REGISTERED",
-            changed_by="AIVOA Copilot (LangGraph)",
-            details={"severity": severity, "category": category}
-        )
-        db.add(audit_entry)
+        existing = db.query(models.QMSComplaint).filter(models.QMSComplaint.qms_log_id == log_id).first()
+        if existing:
+            existing.complaint_source = source
+            existing.customer_name = cust_name
+            existing.product_name = prod_name
+            existing.product_strength = prod_strength
+            existing.batch_lot_number = batch_no
+            existing.affected_quantity = affected_qty
+            existing.manufacturing_date = mfg_date
+            existing.expiry_date = exp_date
+            existing.originating_site_block = site_block
+            existing.impacted_npm = npm
+            existing.complaint_category = category
+            existing.complaint_description = description
+            existing.status = status_val
+            existing.severity_suggested = severity
+            existing.suggested_next_action = next_action
+            existing.initial_risk_assessment = risk_assess
+            complaint = existing
+        else:
+            complaint = models.QMSComplaint(
+                qms_log_id=log_id,
+                complaint_source=source,
+                customer_name=cust_name,
+                product_name=prod_name,
+                product_strength=prod_strength,
+                batch_lot_number=batch_no,
+                affected_quantity=affected_qty,
+                manufacturing_date=mfg_date,
+                expiry_date=exp_date,
+                originating_site_block=site_block,
+                impacted_npm=npm,
+                complaint_category=category,
+                complaint_description=description,
+                status=status_val,
+                severity_suggested=severity,
+                suggested_next_action=next_action,
+                initial_risk_assessment=risk_assess
+            )
+            db.add(complaint)
+            
+            audit_entry = models.QMSAuditTrail(
+                qms_log_id=log_id,
+                action="COMPLAINT_REGISTERED",
+                changed_by="AIVOA Copilot (LangGraph)",
+                details={"severity": severity, "category": category}
+            )
+            db.add(audit_entry)
         
         db.commit()
         db.refresh(complaint)
-        return {"status": "success", "data": complaint}
+        return {"status": "success", "data": format_complaint_response(complaint)}
     except Exception as e:
         db.rollback()
+        print(f"Error saving complaint to DB: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save complaint to DB: {str(e)}")
 
 if __name__ == "__main__":

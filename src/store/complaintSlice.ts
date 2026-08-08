@@ -41,8 +41,11 @@ export const complaintSlice = createSlice({
     clearFieldHighlights: (state) => {
       state.updatedFields = [];
     },
-    commitToQMS: (state) => {
-      const logId = `QMS-CMP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+    setHistory: (state, action: PayloadAction<QMSLogRecord[]>) => {
+      state.history = action.payload;
+    },
+    commitToQMS: (state, action?: PayloadAction<{ logId?: string }>) => {
+      const logId = action?.payload?.logId || `QMS-CMP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
       const now = new Date().toLocaleString();
       const { history, ...cleanState } = state;
       const record: QMSLogRecord = {
@@ -54,7 +57,9 @@ export const complaintSlice = createSlice({
         committedAt: now,
         updatedFields: []
       };
-      state.history.unshift(record);
+      
+      // Avoid duplicates in history
+      state.history = [record, ...state.history.filter(h => h.qmsLogId !== logId)];
       state.status = 'Committed';
       state.qmsLogId = logId;
       state.committedAt = now;
@@ -83,5 +88,5 @@ export const complaintSlice = createSlice({
   }
 });
 
-export const { updateFormFields, clearFieldHighlights, commitToQMS, resetForm } = complaintSlice.actions;
+export const { updateFormFields, clearFieldHighlights, setHistory, commitToQMS, resetForm } = complaintSlice.actions;
 export default complaintSlice.reducer;

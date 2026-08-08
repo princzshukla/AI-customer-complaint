@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { useAppSelector } from '../store';
+import React, { useEffect, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setHistory } from '../store/complaintSlice';
 import { X, Database, Search, ShieldCheck, Download } from 'lucide-react';
+import { API_BASE_URL } from '../lib/api';
 
 interface QMSHistoryModalProps {
   isOpen: boolean;
@@ -8,8 +10,22 @@ interface QMSHistoryModalProps {
 }
 
 export const QMSHistoryModal: React.FC<QMSHistoryModalProps> = ({ isOpen, onClose }) => {
+  const dispatch = useAppDispatch();
   const { history } = useAppSelector((state) => state.complaint);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch(`${API_BASE_URL}/api/complaints`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            dispatch(setHistory(data));
+          }
+        })
+        .catch((err) => console.warn('Could not fetch complaints from API:', err));
+    }
+  }, [isOpen, dispatch]);
 
   if (!isOpen) return null;
 

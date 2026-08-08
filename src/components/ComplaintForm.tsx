@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store';
-import { updateFormFields, commitToQMS, clearFieldHighlights } from '../store/complaintSlice';
+import { updateFormFields, commitToQMS, clearFieldHighlights, setHistory } from '../store/complaintSlice';
 import { Sparkles, Building2, Package, ShieldAlert, CheckCircle2, Factory, Wrench, FileCheck2 } from 'lucide-react';
 import { AIInsightsModal } from './AIInsightsModal';
 import { API_BASE_URL } from '../lib/api';
@@ -29,9 +29,11 @@ export const ComplaintForm: React.FC = () => {
 
   const handleCommit = async (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(commitToQMS());
 
-    const logId = complaintState.qmsLogId || `QMS-${Date.now()}`;
+    const logId = complaintState.qmsLogId || `QMS-CMP-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    // Local commit to Redux state
+    dispatch(commitToQMS({ logId } as any));
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/complaints`, {
@@ -74,7 +76,16 @@ export const ComplaintForm: React.FC = () => {
         })
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        // Refresh full complaint history list from DB
+        const resList = await fetch(`${API_BASE_URL}/api/complaints`);
+        if (resList.ok) {
+          const listData = await resList.json();
+          if (Array.isArray(listData) && listData.length > 0) {
+            dispatch(setHistory(listData));
+          }
+        }
+      } else {
         console.warn('Backend responded with status:', response.status);
       }
     } catch (err) {
