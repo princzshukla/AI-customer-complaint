@@ -3,6 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import zlib from 'zlib';
 // @ts-ignore
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
@@ -340,28 +341,47 @@ async function startServer() {
           const tjRegex = /\(([^()\r\n]*)\)\s*(?:Tj|TJ|\')/g;
           let match;
           while ((match = tjRegex.exec(str)) !== null) {
-            if (match[1] && match[1].trim()) {
+            if (match[1] && match[1].trim() && match[1].trim().length > 1) {
               textMatches.push(match[1].trim());
             }
           }
 
-          // Match bracketed array text [(Text1) 10 (Text2)] TJ
-          if (textMatches.length < 3) {
-            const bracketRegex = /\[\s*(?:\(([^()]*)\)|[^\]\()]+)+\]\s*TJ/g;
-            let bMatch;
-            while ((bMatch = bracketRegex.exec(str)) !== null) {
-              const innerPdfText = bMatch[0];
-              const innerParentheses = /\(([^()]*)\)/g;
-              let pMatch;
-              while ((pMatch = innerParentheses.exec(innerPdfText)) !== null) {
-                if (pMatch[1] && pMatch[1].trim()) {
-                  textMatches.push(pMatch[1].trim());
+          // Decompress zlib streams
+          const streamRegex = /stream[\r\n]+([\s\S]*?)endstream/g;
+          let streamMatch;
+          while ((streamMatch = streamRegex.exec(str)) !== null) {
+            try {
+              const streamStart = streamMatch.index + streamMatch[0].indexOf('\n') + 1;
+              const streamEnd = streamMatch.index + streamMatch[0].lastIndexOf('endstream');
+              const streamBuf = pdfBuffer.subarray(streamStart, streamEnd);
+              
+              const decompressed = zlib.inflateSync(streamBuf).toString('binary');
+              
+              let subMatch;
+              const subTjRegex = /\(([^()\r\n]*)\)\s*(?:Tj|TJ|\')/g;
+              while ((subMatch = subTjRegex.exec(decompressed)) !== null) {
+                if (subMatch[1] && subMatch[1].trim() && subMatch[1].trim().length > 1) {
+                  textMatches.push(subMatch[1].trim());
                 }
               }
+              
+              const bracketRegex = /\[\s*(?:\(([^()]*)\)|[^\]\()]+)+\]\s*TJ/g;
+              let bMatch;
+              while ((bMatch = bracketRegex.exec(decompressed)) !== null) {
+                const innerParentheses = /\(([^()]*)\)/g;
+                let pMatch;
+                while ((pMatch = innerParentheses.exec(bMatch[0])) !== null) {
+                  if (pMatch[1] && pMatch[1].trim() && pMatch[1].trim().length > 1) {
+                    textMatches.push(pMatch[1].trim());
+                  }
+                }
+              }
+            } catch {
+              // Stream decompression skipped if uncompressed or invalid
             }
           }
 
-          return textMatches.join('\n');
+          return textMatches.join(' ');
         } catch {
           return '';
         }
