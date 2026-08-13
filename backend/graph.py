@@ -3,7 +3,6 @@ import base64
 import zlib
 import re
 import io
-import importlib
 from typing import TypedDict, List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
@@ -11,11 +10,59 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 
+# Lazy initialization helper for HuggingFace embeddings
+_embeddings_instance = None
+
+def get_huggingface_embeddings():
+    global _embeddings_instance
+    if _embeddings_instance is None:
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+            _embeddings_instance = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                encode_kwargs={"normalize_embeddings": True}
+            )
+        except Exception as e:
+            print(f"HuggingFaceEmbeddings initialization notice: {e}")
+            _embeddings_instance = None
+    return _embeddings_instance
+
+def get_semantic_context(extracted_text: str, query: str) -> str:
+    """Retrieve top relevant semantic chunks using HuggingFace sentence-transformers embeddings."""
+    if not extracted_text or len(extracted_text.strip()) < 50:
+        return extracted_text
+
+    emb = get_huggingface_embeddings()
+    if not emb:
+        return extracted_text[:12000]
+
+    try:
+        chunks = [c.strip() for c in re.split(r'\n\n+|\.\s+', extracted_text) if len(c.strip()) > 15]
+        if not chunks or len(chunks) <= 3:
+            return extracted_text[:12000]
+
+        # Compute query vector and document vectors locally
+        query_vector = emb.embed_query(query or "pharmaceutical quality complaint report details")
+        doc_vectors = emb.embed_documents(chunks[:50]) # limit max chunks for speed
+
+        # Rank chunks by dot product similarity (vectors are normalized)
+        scores = []
+        for idx, vec in enumerate(doc_vectors):
+            dot_product = sum(q * d for q, d in zip(query_vector, vec))
+            scores.append((dot_product, chunks[idx]))
+
+        scores.sort(key=lambda x: x[0], reverse=True)
+        top_chunks = [item[1] for item in scores[:5]]
+        return "\n".join(top_chunks)
+    except Exception as e:
+        print(f"Semantic search embedding notice: {e}")
+        return extracted_text[:12000]
+
 def extract_pdf_text_python(pdf_bytes: bytes) -> str:
     """Extract text from PDF using pypdf or native zlib stream decompression."""
     # 1. Try pypdf if installed
     try:
-        pypdf = importlib.import_module("pypdf")
+        import pypdf
         reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
         extracted = []
         for page in reader.pages:
@@ -220,7 +267,8 @@ def process_complaint_node(state: ComplaintState) -> ComplaintState:
 
     user_prompt_content = f"User request: {prompt}"
     if extracted_text and len(extracted_text.strip()) > 10:
-        user_prompt_content += f"\n\nATTACHED FILE CONTENT ({attachment_name or 'Document'}):\n{extracted_text[:12000]}"
+        relevant_context = get_semantic_context(extracted_text, prompt)
+        user_prompt_content += f"\n\nATTACHED FILE CONTENT ({attachment_name or 'Document'}) [SEMANTIC VECTOR EXTRACT]:\n{relevant_context}"
 
     system_prompt = f"""
 You are AIVOA Copilot, a LangGraph AI agent managing a Pharmaceutical Quality Assurance Customer Complaint system.
